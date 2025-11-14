@@ -1,21 +1,39 @@
 # Title
-Flagship Retail Promotions Matrix
+Retail Promotions Pricing Test
 
 # Description
-The flagship apparel chain is rewriting its in-store promotions calendar ahead of peak back-to-school traffic. Four regional clusters are piloting wildly different discount philosophies: a dependable 15% off message to build trust, a tiered ladder that deepens discounts on high-margin assortments, sporadic flash-sale weekends built for urgency, and a loyalty bundle that pairs lighter discounts with app-exclusive perks. Each cluster reports weekly gross-margin dollars per store, adjusted for traffic and staffing.
+A nationwide retailer alternated its loyalty pricing banners between “Compare & Save” language and a new “Bundle Rewards” frame across 20 stores. Teams captured the basket lift (new condition minus legacy) for each store to see whether the softer framing nudged shoppers toward bigger baskets without additional discounts.
 
-Merchandising leaders are debating whether “steady Eddie” pricing protects perception, while the loyalty team argues that bundling perks keeps high-value shoppers engaged. This preset loads the observed results so you can measure how each storyline pulls on the grand mean before committing to one playbook for 1,200 stores.
+These difference scores show the incremental dollars per basket when the Bundle Rewards banners were in market. Load the preset to experiment with alternative α levels or to see how the histogram reacts to the imported CSV.
 
 # Alpha
-0.10
+0.04
 
-# Groups
-Steady 15 Percent|32.4|3.9|85
-Tiered Promo Calendar|34.1|4.5|82
-Flash Sale Bursts|30.8|4.2|78
-Loyalty Bundle Weekends|33.6|4.0|88
+# Input Mode
+difference
 
-# Additional Inputs
-axis_min=
-axis_max=
-mean_reference=
+# Difference Column
+diff
+2.8
+3.1
+1.4
+2.3
+3.6
+2.1
+1.9
+2.5
+3.3
+2.0
+1.7
+2.9
+3.4
+2.6
+1.8
+2.2
+3.0
+2.4
+1.5
+2.7
+
+# Raw Data File
+file=scenarios/data/retail_pricing_diff.csv

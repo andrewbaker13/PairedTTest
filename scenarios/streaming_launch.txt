@@ -2,23 +2,34 @@
 Global Streaming Launch Creative Test
 
 # Description
-The brand studio is in final rehearsals for a multi-continent streaming bundle launch. Three radically different creative ideas are vying for the hero slot on connected TV, social video, and digital out‑of‑home. One is a lush, big-budget short film that tugs at heart strings; another is a promotion-forward carousel that shouts introductory pricing; the third is a playful influencer cameo reel stitched from creators across markets. Media is live in 14 DMAs and the KPI is incremental revenue per household exposure, normalized for reach.
+The brand studio is in final rehearsals for a multi-continent streaming bundle launch. Sixteen connected TV markets beta-tested a cinematic hero spot while the same households later saw an optimized promo cut. Incremental revenue per household was tracked in both windows, letting us measure creative lift without mixing in fresh media or targeting changes.
 
-Product marketing believes the cinematic film creates halo value that justifies its production spend, but the growth team suspects the scrappier executions will scale more efficiently. This preset packages the observed means, variability, and sample sizes so you can see which creative is truly bending the overall mean before the global rollout is locked.
+The studio believes the lush hero spot creates halo value that justifies its spend, but the growth team suspects the promo-led edit will scale more efficiently. Use the paired data to preview the lift before the global rollout is locked.
 
 # Alpha
 0.05
 
-# Groups
-Emotion-led Hero Film|48.5|5.4|140
-Promotion-Heavy Carousel|45.9|4.8|150
-Influencer Cameo Reel|47.4|5.0|138
+# Input Mode
+paired
 
-# Planned Comparisons
-Emotion-led Hero Film|Influencer Cameo Reel
-Emotion-led Hero Film|Promotion-Heavy Carousel
+# Paired Columns
+before,after
+48.5,52.1
+45.9,49.2
+47.4,52.4
+46.1,50.1
+49.3,53.5
+44.8,48.6
+45.2,50.4
+46.7,51.5
+47.9,54.2
+48.1,52.7
+46.4,49.8
+45.6,50.0
+47.0,52.2
+48.7,53.1
+46.9,51.7
+45.5,49.3
 
-# Additional Inputs
-axis_min=
-axis_max=
-mean_reference=
+# Raw Data File
+file=scenarios/data/streaming_launch.csv

@@ -2,18 +2,16 @@
 B2B Nurture Content Tracks
 
 # Description
-A SaaS demand team is resurrecting a massive pool of dormant enterprise leads. Two nurture “worlds” are live: the Tutorial Deep Dive series that drip-feeds hands-on product walkthroughs, and an Executive ROI story track that delivers board-level business cases to economic buyers. Each track reports qualified pipeline dollars created per contacted lead, segmented across six verticals with different buying committees.
+A conversion marketing team wants to know whether its new insight-driven nurture emails outperform the long-standing product spec series. Because both sets were sent to the same 34 in-market accounts (separated by two weeks), the analyst only has access to summary stats on the change in marketing qualified opportunities per account.
 
-Sales leadership wants evidence on whether helpful, how-to content actually carries prospects further than inspirational ROI stories, or if senior decision makers need an executive tone to re-engage. Load this preset to see which track is reshaping the overall mean before the next two quarters of nurture creative are funded.
+The data below reflect the mean and standard deviation of the paired differences (insights track minus legacy). Plug them into the summary mode to sanity-check the uplift story—or switch to your own CRM export if new data arrive.
 
 # Alpha
-0.01
+0.05
 
-# Groups
-Tutorial Deep Dive Series|56.2|6.3|64
-Executive ROI Story Track|59.7|5.8|70
+# Input Mode
+summary
 
-# Additional Inputs
-axis_min=
-axis_max=
-mean_reference=
+# Summary Stats
+mean_diff|sd_diff|n
+1.6|2.4|34
