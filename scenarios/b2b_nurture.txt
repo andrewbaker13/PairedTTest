@@ -2,9 +2,12 @@
 B2B Nurture Content Tracks
 
 # Description
-A conversion marketing team wants to know whether its new insight-driven nurture emails outperform the long-standing product spec series. Because both sets were sent to the same 34 in-market accounts (separated by two weeks), the analyst only has access to summary stats on the change in marketing qualified opportunities per account.
+A conversion marketing squad wants to know whether its new insight-led nurture series outperforms the long-standing product-spec drip. Both tracks were served to the same 34 in-market accounts (two-week washout between flights), and the analyst had time to summarize only the change in marketing-qualified opportunities per account before the CMO review.
 
-The data below reflect the mean and standard deviation of the paired differences (insights track minus legacy). Plug them into the summary mode to sanity-check the uplift story—or switch to your own CRM export if new data arrive.
+The summary stats below capture the mean and standard deviation of the paired differences (insights track − legacy track) plus the number of sampled accounts. Use the preset to:
+- Confirm whether the uplift still clears the bar when α is tightened to 0.025 for the finance gate.
+- Stress-test the effect size by editing the SD upward—sales ops warned that a few accounts experienced wild week-to-week swings.
+- Copy the APA and managerial blurbs into the nurture optimization deck so stakeholders see both the statistical verdict and the business framing.
 
 # Alpha
 0.05

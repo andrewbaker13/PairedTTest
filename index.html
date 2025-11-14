@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -48,7 +48,7 @@
                     <select id="scenario-select">
                         <option value="">Manual inputs (no preset)</option>
                     </select>
-                    <button id="scenario-download" class="secondary" disabled>Download scenario dataset</button>
+                    <button id="scenario-download" class="secondary hidden" disabled>Download scenario dataset</button>
                 </div>
             </div>
             <div id="scenario-description">
@@ -60,10 +60,9 @@
             <div class="input-header">
                 <h2>Data Entry</h2>
                 <div class="alpha-controls">
-                    <label for="alpha">Significance level (α):</label>
+                    <label for="alpha">Significance level (&alpha;):</label>
                     <input type="number" id="alpha" min="0.001" max="0.20" step="0.001" value="0.050">
                     <div class="confidence-buttons" role="group" aria-label="Select confidence level">
-                        <button type="button" class="confidence-button" data-level="0.80">80% CI</button>
                         <button type="button" class="confidence-button" data-level="0.90">90% CI</button>
                         <button type="button" class="confidence-button active" data-level="0.95">95% CI</button>
                         <button type="button" class="confidence-button" data-level="0.99">99% CI</button>
@@ -72,8 +71,9 @@
             </div>
 
             <div class="mode-toggle" role="tablist" aria-label="Data entry mode">
-                <button type="button" class="mode-button active" data-mode="paired">Paired columns</button>
-                <button type="button" class="mode-button" data-mode="difference">Difference column</button>
+                <button type="button" class="mode-button active" data-mode="paired">Paired upload</button>
+                <button type="button" class="mode-button" data-mode="difference">Difference upload</button>
+                <button type="button" class="mode-button" data-mode="manual">Manual entry</button>
                 <button type="button" class="mode-button" data-mode="summary">Summary stats</button>
             </div>
 
@@ -83,7 +83,7 @@
                         <p class="dropzone-title">Drop a .csv, .tsv, or .txt with headers</p>
                         <p id="dropzone-instructions">Paired mode expects two named columns (before & after). Difference mode expects a single column named <code>diff</code>. Blank rows are ignored.</p>
                         <button type="button" id="browse-files" class="secondary">Browse files</button>
-                        <p class="dropzone-note">We only scan files locally—no uploads leave your browser.</p>
+                        <p class="dropzone-note">We only scan files locally&mdash;no uploads leave your browser. Up to 2,000 rows per file.</p>
                     </div>
                     <input type="file" id="file-input" accept=".csv,.tsv,.txt" hidden>
                 </div>
@@ -96,43 +96,57 @@
 
             <div class="mode-panels">
                 <div class="mode-panel active" data-mode="paired" id="paired-panel">
-                    <p>Enter aligned before/after measurements. Rows with both values populate the paired t-test.</p>
-                    <div class="table-actions">
-                        <button type="button" id="add-paired-row">+ Add row</button>
-                        <button type="button" id="clear-paired" class="link-button">Clear</button>
-                    </div>
-                    <div class="data-table" role="region" aria-label="Paired input table">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th scope="col">Label</th>
-                                    <th scope="col">Before</th>
-                                    <th scope="col">After</th>
-                                    <th scope="col" aria-hidden="true"><span class="sr-only">Remove</span></th>
-                                </tr>
-                            </thead>
-                            <tbody id="paired-table-body"></tbody>
-                        </table>
-                    </div>
+                    <p>Upload a file with two columns (before, after). We will parse it immediately and let you know how many rows were accepted.</p>
+                    <p id="paired-upload-status" class="upload-status">No file uploaded yet.</p>
                 </div>
 
                 <div class="mode-panel" data-mode="difference" id="difference-panel">
-                    <p>Paste or enter the observed differences directly. Positive values mean the second measurement exceeded the first.</p>
-                    <div class="table-actions">
-                        <button type="button" id="add-diff-row">+ Add row</button>
-                        <button type="button" id="clear-diff" class="link-button">Clear</button>
+                    <p>Upload a single-column file of difference scores (positive values mean after &gt; before). We will summarize the usable row count.</p>
+                    <p id="difference-upload-status" class="upload-status">No file uploaded yet.</p>
+                </div>
+
+                <div class="mode-panel" data-mode="manual" id="manual-panel">
+                    <p>Type smaller paired datasets directly. Choose whether you are entering aligned before/after measurements or difference scores, then set how many rows you need (maximum of 50). For bigger tables, switch to an upload mode.</p>
+                    <div class="manual-controls">
+                        <label>
+                            Data structure
+                            <select id="manual-entry-structure">
+                                <option value="paired">Before &amp; after pairs</option>
+                                <option value="difference">Difference scores</option>
+                            </select>
+                        </label>
+                        <label>
+                            Row count (max 50)
+                            <input type="number" id="manual-row-count" min="2" max="50" value="8">
+                        </label>
                     </div>
-                    <div class="data-table" role="region" aria-label="Difference input table">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th scope="col">Label</th>
-                                    <th scope="col">Difference</th>
-                                    <th scope="col" aria-hidden="true"><span class="sr-only">Remove</span></th>
-                                </tr>
-                            </thead>
-                            <tbody id="difference-table-body"></tbody>
-                        </table>
+                    <p class="manual-hint">Need more than 50 rows? Head to one of the upload modes.</p>
+                    <div class="manual-table" data-structure="paired">
+                        <div class="data-table" role="region" aria-label="Manual paired input table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Row</th>
+                                        <th scope="col">Before</th>
+                                        <th scope="col">After</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="paired-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="manual-table hidden" data-structure="difference">
+                        <div class="data-table" role="region" aria-label="Manual difference input table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Row</th>
+                                        <th scope="col">Difference</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="difference-table-body"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
@@ -185,6 +199,7 @@
             <article class="chart-card">
                 <h3>Mean difference with confidence interval</h3>
                 <div id="mean-diff-chart" class="chart-placeholder" aria-label="Mean difference chart"></div>
+                <p id="mean-diff-chart-note" class="chart-note">Provide data to summarize the mean difference and confidence interval.</p>
             </article>
             <article class="chart-card">
                 <h3>Distribution of differences</h3>
@@ -207,10 +222,12 @@
         </section>
 
         <section class="card diagnostics-section">
-            <h2>Assumption checks</h2>
-            <div id="diagnostics-content">
-                <p>The paired t-test assumes the differences follow an approximately normal distribution, observations are paired correctly, and each pair is independent of the others. We will summarize diagnostics here after you provide data.</p>
-            </div>
+            <details class="diagnostics-details">
+                <summary>Assumption checks</summary>
+                <div id="diagnostics-content">
+                    <p>The paired t-test assumes the differences follow an approximately normal distribution, observations are paired correctly, and each pair is independent of the others. We will summarize diagnostics here after you provide data.</p>
+                </div>
+            </details>
         </section>
     </main>
 
@@ -222,3 +239,6 @@
 </body>
 
 </html>
+
+
+

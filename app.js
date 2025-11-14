@@ -2,24 +2,37 @@ const CREATED_DATE = new Date('2025-11-06').toLocaleDateString();
 let modifiedDate = new Date().toLocaleDateString();
 
 const InputModes = Object.freeze({
+    MANUAL: 'manual',
     PAIRED: 'paired',
     DIFFERENCE: 'difference',
     SUMMARY: 'summary'
 });
 
 const MODE_LABELS = {
-    [InputModes.PAIRED]: 'Paired columns',
-    [InputModes.DIFFERENCE]: 'Difference column',
+    [InputModes.MANUAL]: 'Manual entry',
+    [InputModes.PAIRED]: 'Paired upload',
+    [InputModes.DIFFERENCE]: 'Difference upload',
     [InputModes.SUMMARY]: 'Summary stats'
 };
 
-const INITIAL_ROWS = 8;
+const ManualStructures = Object.freeze({
+    PAIRED: 'paired',
+    DIFFERENCE: 'difference'
+});
+
+const DEFAULT_MANUAL_ROWS = 8;
+const MAX_MANUAL_ROWS = 50;
+const MAX_UPLOAD_ROWS = 2000;
 
 let activeMode = InputModes.PAIRED;
 let selectedConfidenceLevel = 0.95;
+let manualStructure = ManualStructures.PAIRED;
+let manualRowCount = DEFAULT_MANUAL_ROWS;
 let scenarioManifest = [];
 let defaultScenarioDescription = '';
 let scenarioRawFile = '';
+let uploadedPairedData = null;
+let uploadedDifferenceData = null;
 
 // Utility helpers
 function clamp(value, min, max) {
@@ -206,83 +219,112 @@ function formatPValue(p) {
     return `p = ${p.toFixed(3).replace(/^0/, '')}`;
 }
 
-function generatePairLabel(index) {
-    return `Pair ${index + 1}`;
-}
-
-function addPairedRow(values = {}) {
+function snapshotManualPairedValues() {
     const tbody = document.getElementById('paired-table-body');
-    if (!tbody) return;
-    const index = tbody.children.length;
-    const row = document.createElement('tr');
-    row.innerHTML = `
-        <td>
-            <input type="text" class="paired-label" placeholder="${generatePairLabel(index)}" value="${values.label || ''}">
-        </td>
-        <td>
-            <input type="number" class="paired-before" step="any" value="${isFinite(values.before) ? values.before : ''}">
-        </td>
-        <td>
-            <input type="number" class="paired-after" step="any" value="${isFinite(values.after) ? values.after : ''}">
-        </td>
-        <td>
-            <button type="button" class="remove-row" aria-label="Remove row">&times;</button>
-        </td>
-    `;
-    row.querySelectorAll('input').forEach(input => {
-        input.addEventListener('input', () => updateResults());
+    if (!tbody) return [];
+    return Array.from(tbody.querySelectorAll('tr')).map(row => {
+        const beforeInput = row.querySelector('.paired-before');
+        const afterInput = row.querySelector('.paired-after');
+        const before = beforeInput && beforeInput.value !== '' ? parseFloat(beforeInput.value) : NaN;
+        const after = afterInput && afterInput.value !== '' ? parseFloat(afterInput.value) : NaN;
+        return { before, after };
     });
-    const removeButton = row.querySelector('.remove-row');
-    removeButton.addEventListener('click', () => {
-        row.remove();
-        updateResults();
-    });
-    tbody.appendChild(row);
 }
 
-function clearPairedRows() {
+function snapshotManualDifferenceValues() {
+    const tbody = document.getElementById('difference-table-body');
+    if (!tbody) return [];
+    return Array.from(tbody.querySelectorAll('tr')).map(row => {
+        const valueInput = row.querySelector('.diff-value');
+        const diff = valueInput && valueInput.value !== '' ? parseFloat(valueInput.value) : NaN;
+        return { diff };
+    });
+}
+
+function renderPairedRows(existingValues = []) {
     const tbody = document.getElementById('paired-table-body');
     if (!tbody) return;
     tbody.innerHTML = '';
-    for (let i = 0; i < INITIAL_ROWS; i++) {
-        addPairedRow();
+    for (let i = 0; i < manualRowCount; i++) {
+        const beforeValue = existingValues[i] && isFinite(existingValues[i].before) ? existingValues[i].before : '';
+        const afterValue = existingValues[i] && isFinite(existingValues[i].after) ? existingValues[i].after : '';
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><span class="row-number">${i + 1}</span></td>
+            <td><input type="number" class="paired-before" step="any" value="${beforeValue !== '' ? beforeValue : ''}"></td>
+            <td><input type="number" class="paired-after" step="any" value="${afterValue !== '' ? afterValue : ''}"></td>
+        `;
+        row.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', () => updateResults());
+        });
+        tbody.appendChild(row);
     }
 }
 
-function addDifferenceRow(values = {}) {
-    const tbody = document.getElementById('difference-table-body');
-    if (!tbody) return;
-    const index = tbody.children.length;
-    const row = document.createElement('tr');
-    row.innerHTML = `
-        <td>
-            <input type="text" class="diff-label" placeholder="${generatePairLabel(index)}" value="${values.label || ''}">
-        </td>
-        <td>
-            <input type="number" class="diff-value" step="any" value="${isFinite(values.diff) ? values.diff : ''}">
-        </td>
-        <td>
-            <button type="button" class="remove-row" aria-label="Remove row">&times;</button>
-        </td>
-    `;
-    row.querySelectorAll('input').forEach(input => {
-        input.addEventListener('input', () => updateResults());
-    });
-    const removeButton = row.querySelector('.remove-row');
-    removeButton.addEventListener('click', () => {
-        row.remove();
-        updateResults();
-    });
-    tbody.appendChild(row);
-}
-
-function clearDifferenceRows() {
+function renderDifferenceRows(existingValues = []) {
     const tbody = document.getElementById('difference-table-body');
     if (!tbody) return;
     tbody.innerHTML = '';
-    for (let i = 0; i < INITIAL_ROWS; i++) {
-        addDifferenceRow();
+    for (let i = 0; i < manualRowCount; i++) {
+        const diffValue = existingValues[i] && isFinite(existingValues[i].diff) ? existingValues[i].diff : '';
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><span class="row-number">${i + 1}</span></td>
+            <td><input type="number" class="diff-value" step="any" value="${diffValue !== '' ? diffValue : ''}"></td>
+        `;
+        row.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', () => updateResults());
+        });
+        tbody.appendChild(row);
     }
+}
+
+function setManualRowCount(value, { preserveValues = true } = {}) {
+    const parsed = Number.isInteger(value) ? value : parseInt(value, 10);
+    const clamped = clamp(isFinite(parsed) ? parsed : DEFAULT_MANUAL_ROWS, 2, MAX_MANUAL_ROWS);
+    const pairedValues = preserveValues ? snapshotManualPairedValues() : [];
+    const diffValues = preserveValues ? snapshotManualDifferenceValues() : [];
+    manualRowCount = clamped;
+    const input = document.getElementById('manual-row-count');
+    if (input && parseInt(input.value, 10) !== clamped) {
+        input.value = clamped;
+    }
+    renderPairedRows(pairedValues);
+    renderDifferenceRows(diffValues);
+}
+
+function toggleManualStructureViews() {
+    document.querySelectorAll('.manual-table').forEach(section => {
+        const isActive = section.dataset.structure === manualStructure;
+        section.classList.toggle('hidden', !isActive);
+    });
+    const select = document.getElementById('manual-entry-structure');
+    if (select) {
+        select.value = manualStructure;
+    }
+}
+
+function setupManualControls() {
+    const structureSelect = document.getElementById('manual-entry-structure');
+    if (structureSelect) {
+        structureSelect.addEventListener('change', () => {
+            manualStructure = structureSelect.value === ManualStructures.DIFFERENCE
+                ? ManualStructures.DIFFERENCE
+                : ManualStructures.PAIRED;
+            toggleManualStructureViews();
+            updateResults();
+        });
+    }
+    const rowCountInput = document.getElementById('manual-row-count');
+    if (rowCountInput) {
+        rowCountInput.addEventListener('change', () => {
+            const value = parseInt(rowCountInput.value, 10);
+            setManualRowCount(value);
+            updateResults();
+        });
+    }
+    setManualRowCount(manualRowCount, { preserveValues: false });
+    toggleManualStructureViews();
 }
 
 function collectPairedRows() {
@@ -296,41 +338,37 @@ function collectPairedRows() {
         return { rows, beforeValues, afterValues, differenceValues, partialRows };
     }
     tbody.querySelectorAll('tr').forEach((row, index) => {
-        const labelInput = row.querySelector('.paired-label');
         const beforeInput = row.querySelector('.paired-before');
         const afterInput = row.querySelector('.paired-after');
-        const label = labelInput && labelInput.value.trim() ? labelInput.value.trim() : generatePairLabel(index);
-        const before = beforeInput ? parseFloat(beforeInput.value) : NaN;
-        const after = afterInput ? parseFloat(afterInput.value) : NaN;
+        const before = beforeInput && beforeInput.value !== '' ? parseFloat(beforeInput.value) : NaN;
+        const after = afterInput && afterInput.value !== '' ? parseFloat(afterInput.value) : NaN;
         const hasBefore = isFinite(before);
         const hasAfter = isFinite(after);
         if (hasBefore && hasAfter) {
             const diff = after - before;
-            rows.push({ label, before, after, diff });
+            rows.push({ before, after, diff });
             beforeValues.push(before);
             afterValues.push(after);
             differenceValues.push(diff);
         } else if (hasBefore || hasAfter) {
-            partialRows.push(label);
+            partialRows.push(`Row ${index + 1}`);
         }
     });
     return { rows, beforeValues, afterValues, differenceValues, partialRows };
 }
 
 function collectDifferenceRows() {
-    const rows = [];
+    const values = [];
     const tbody = document.getElementById('difference-table-body');
-    if (!tbody) return rows;
-    tbody.querySelectorAll('tr').forEach((row, index) => {
-        const labelInput = row.querySelector('.diff-label');
+    if (!tbody) return values;
+    tbody.querySelectorAll('tr').forEach((row) => {
         const valueInput = row.querySelector('.diff-value');
-        const label = labelInput && labelInput.value.trim() ? labelInput.value.trim() : generatePairLabel(index);
-        const diff = valueInput ? parseFloat(valueInput.value) : NaN;
+        const diff = valueInput && valueInput.value !== '' ? parseFloat(valueInput.value) : NaN;
         if (isFinite(diff)) {
-            rows.push({ label, diff });
+            values.push(diff);
         }
     });
-    return rows;
+    return values;
 }
 
 function collectSummaryStats() {
@@ -349,13 +387,51 @@ function gatherInput() {
         return { valid: false, message: 'Alpha must be between 0 and 1.' };
     }
 
-    if (activeMode === InputModes.PAIRED) {
-        const { rows, beforeValues, afterValues, differenceValues, partialRows } = collectPairedRows();
-        if (partialRows.length) {
-            return { valid: false, message: `Complete both before and after values for ${partialRows.join(', ')}.` };
+    if (activeMode === InputModes.MANUAL) {
+        if (manualStructure === ManualStructures.PAIRED) {
+            const { beforeValues, afterValues, differenceValues, partialRows } = collectPairedRows();
+            if (partialRows.length) {
+                return { valid: false, message: `Complete both before and after values for ${partialRows.join(', ')}.` };
+            }
+            if (differenceValues.length < 2) {
+                return { valid: false, message: 'Provide at least two paired observations.' };
+            }
+            return {
+                valid: true,
+                data: {
+                    mode: InputModes.MANUAL,
+                    manualStructure,
+                    alpha,
+                    confidence: selectedConfidenceLevel,
+                    differences: differenceValues,
+                    beforeValues,
+                    afterValues,
+                    summaryOnly: false
+                }
+            };
         }
-        if (rows.length < 2) {
-            return { valid: false, message: 'Provide at least two paired observations.' };
+        const diffs = collectDifferenceRows();
+        if (diffs.length < 2) {
+            return { valid: false, message: 'Enter at least two difference scores.' };
+        }
+        return {
+            valid: true,
+            data: {
+                mode: InputModes.MANUAL,
+                manualStructure,
+                alpha,
+                confidence: selectedConfidenceLevel,
+                differences: diffs,
+                beforeValues: [],
+                afterValues: [],
+                summaryOnly: false
+            }
+        };
+    }
+
+    if (activeMode === InputModes.PAIRED) {
+        if (!uploadedPairedData || !Array.isArray(uploadedPairedData.differences) || uploadedPairedData.differences.length < 2) {
+            return { valid: false, message: 'Upload at least two paired observations.' };
         }
         return {
             valid: true,
@@ -363,19 +439,17 @@ function gatherInput() {
                 mode: InputModes.PAIRED,
                 alpha,
                 confidence: selectedConfidenceLevel,
-                pairs: rows,
-                differences: differenceValues,
-                beforeValues,
-                afterValues,
+                differences: uploadedPairedData.differences,
+                beforeValues: uploadedPairedData.beforeValues,
+                afterValues: uploadedPairedData.afterValues,
                 summaryOnly: false
             }
         };
     }
 
     if (activeMode === InputModes.DIFFERENCE) {
-        const rows = collectDifferenceRows();
-        if (rows.length < 2) {
-            return { valid: false, message: 'Enter at least two difference scores.' };
+        if (!uploadedDifferenceData || !Array.isArray(uploadedDifferenceData.differences) || uploadedDifferenceData.differences.length < 2) {
+            return { valid: false, message: 'Upload at least two difference scores.' };
         }
         return {
             valid: true,
@@ -383,36 +457,40 @@ function gatherInput() {
                 mode: InputModes.DIFFERENCE,
                 alpha,
                 confidence: selectedConfidenceLevel,
-                pairs: [],
-                differences: rows.map(row => row.diff),
-                labels: rows.map(row => row.label),
+                differences: uploadedDifferenceData.differences,
+                beforeValues: [],
+                afterValues: [],
                 summaryOnly: false
             }
         };
     }
 
-    const stats = collectSummaryStats();
-    if (!isFinite(stats.meanDiff)) {
-        return { valid: false, message: 'Enter a numeric mean difference.' };
-    }
-    if (!isFinite(stats.sdDiff) || stats.sdDiff <= 0) {
-        return { valid: false, message: 'Standard deviation of differences must be positive.' };
-    }
-    if (!Number.isInteger(stats.n) || stats.n < 2) {
-        return { valid: false, message: 'Sample size must be at least 2.' };
-    }
-    return {
-        valid: true,
-        data: {
-            mode: InputModes.SUMMARY,
-            alpha,
-            confidence: selectedConfidenceLevel,
-            pairs: [],
-            differences: [],
-            summaryStats: stats,
-            summaryOnly: true
+    if (activeMode === InputModes.SUMMARY) {
+        const stats = collectSummaryStats();
+        if (!isFinite(stats.meanDiff)) {
+            return { valid: false, message: 'Enter a numeric mean difference.' };
         }
-    };
+        if (!isFinite(stats.sdDiff) || stats.sdDiff <= 0) {
+            return { valid: false, message: 'Standard deviation of differences must be positive.' };
+        }
+        if (!Number.isInteger(stats.n) || stats.n < 2) {
+            return { valid: false, message: 'Sample size must be at least 2.' };
+        }
+        return {
+            valid: true,
+            data: {
+                mode: InputModes.SUMMARY,
+                alpha,
+                confidence: selectedConfidenceLevel,
+                pairs: [],
+                differences: [],
+                summaryStats: stats,
+                summaryOnly: true
+            }
+        };
+    }
+
+    return { valid: false, message: 'Unsupported mode.' };
 }
 
 function computePairedTest(data) {
@@ -468,6 +546,22 @@ function computePairedTest(data) {
     };
 }
 
+function describeModeLabel(data) {
+    if (data && data.mode === InputModes.MANUAL) {
+        const detail = data.manualStructure === ManualStructures.DIFFERENCE
+            ? 'differences'
+            : 'paired values';
+        return `${MODE_LABELS[InputModes.MANUAL]} (${detail})`;
+    }
+    if (data && data.mode && MODE_LABELS[data.mode]) {
+        return MODE_LABELS[data.mode];
+    }
+    if (MODE_LABELS[activeMode]) {
+        return MODE_LABELS[activeMode];
+    }
+    return MODE_LABELS[InputModes.MANUAL];
+}
+
 function updateResultCards(stats, data) {
     const testStat = document.getElementById('test-statistic');
     const pValue = document.getElementById('p-value');
@@ -486,7 +580,7 @@ function updateResultCards(stats, data) {
         hedges.textContent = 'Hedges\' g = --';
         meanDiff.textContent = 'Mean difference = --';
         sampleSummary.textContent = 'n = -- pairs';
-        modeSummary.textContent = `Mode: ${MODE_LABELS[activeMode] || 'Paired columns'}`;
+        modeSummary.textContent = `Mode: ${describeModeLabel({ mode: activeMode, manualStructure })}`;
         return;
     }
 
@@ -497,15 +591,19 @@ function updateResultCards(stats, data) {
     hedges.textContent = `Hedges' g = ${formatNumber(stats.hedgesG, 3)}`;
     meanDiff.textContent = `Mean difference = ${formatNumber(stats.meanDiff, 3)}`;
     sampleSummary.textContent = `n = ${stats.n} pairs`;
-    modeSummary.textContent = `Mode: ${MODE_LABELS[data.mode]}`;
+    modeSummary.textContent = `Mode: ${describeModeLabel(data)}`;
 }
 
 function renderMeanDifferenceChart(stats) {
     if (!window.Plotly) return;
     const container = document.getElementById('mean-diff-chart');
+    const note = document.getElementById('mean-diff-chart-note');
     if (!container) return;
     if (!stats) {
         Plotly.purge(container);
+        if (note) {
+            note.textContent = 'Provide data to summarize the mean difference and confidence interval.';
+        }
         return;
     }
     const trace = {
@@ -556,6 +654,10 @@ function renderMeanDifferenceChart(stats) {
         height: 320
     };
     Plotly.react(container, [trace], layout, { responsive: true, displayModeBar: false });
+    if (note) {
+        const ciLabel = `${Math.round((1 - stats.alpha) * 100)}% CI`;
+        note.textContent = `Mean diff = ${formatNumber(stats.meanDiff, 3)}; ${ciLabel}: [${formatNumber(stats.ciLower)}, ${formatNumber(stats.ciUpper)}]`;
+    }
 }
 
 function renderDifferenceChart(data) {
@@ -577,17 +679,18 @@ function renderDifferenceChart(data) {
         note.textContent = 'Need at least three difference scores to summarize a distribution.';
         return;
     }
-    note.textContent = `Mean = ${formatNumber(mean(diffs))}, SD = ${formatNumber(standardDeviation(diffs))}`;
+    note.textContent = `Mean = ${formatNumber(mean(diffs))}, SD = ${formatNumber(standardDeviation(diffs))} (bars show % of total).`;
 
     const trace = {
         x: diffs,
         type: 'histogram',
+        histnorm: 'percent',
         marker: {
             color: 'rgba(42, 125, 225, 0.4)',
             line: { color: 'rgba(42, 125, 225, 0.8)', width: 1 }
         },
         nbinsx: Math.min(30, Math.ceil(Math.sqrt(diffs.length))),
-        hovertemplate: 'Count: %{y}<br>Difference: %{x:.2f}<extra></extra>'
+        hovertemplate: 'Percent: %{y:.1f}%<br>Difference: %{x:.2f}<extra></extra>'
     };
 
     const layout = {
@@ -600,7 +703,7 @@ function renderDifferenceChart(data) {
             gridcolor: '#eef2fb'
         },
         yaxis: {
-            title: 'Count',
+            title: 'Percent of observations',
             gridcolor: '#eef2fb'
         },
         shapes: [{
@@ -736,8 +839,15 @@ function clearVisuals() {
         Plotly.purge('mean-diff-chart');
         Plotly.purge('difference-chart');
     }
-    document.getElementById('difference-chart-note').textContent = '';
-    updateResultCards(null, { mode: activeMode });
+    const meanNote = document.getElementById('mean-diff-chart-note');
+    if (meanNote) {
+        meanNote.textContent = 'Provide data to summarize the mean difference and confidence interval.';
+    }
+    const diffNote = document.getElementById('difference-chart-note');
+    if (diffNote) {
+        diffNote.textContent = '';
+    }
+    updateResultCards(null, { mode: activeMode, manualStructure });
     updateNarratives(null, null);
     updateDiagnostics(null, null);
 }
@@ -780,14 +890,17 @@ function switchMode(mode, { suppressUpdate = false } = {}) {
     });
     const importTools = document.getElementById('import-tools');
     if (importTools) {
-        importTools.classList.toggle('hidden', mode === InputModes.SUMMARY);
+        importTools.classList.toggle('hidden', mode === InputModes.SUMMARY || mode === InputModes.MANUAL);
     }
     const instructions = document.getElementById('dropzone-instructions');
     if (instructions) {
-        instructions.textContent = mode === InputModes.PAIRED
-            ? 'Provide two named columns such as before,after. Each row becomes a matched pair.'
-            : 'Provide a single column named diff that lists the observed differences.';
+        if (mode === InputModes.PAIRED) {
+            instructions.textContent = 'Provide two named columns such as before,after (up to 2,000 rows). Each row becomes a matched pair.';
+        } else if (mode === InputModes.DIFFERENCE) {
+            instructions.textContent = 'Provide a single column named diff with up to 2,000 rows of observed differences.';
+        }
     }
+    refreshScenarioDownloadVisibility();
     if (!suppressUpdate) {
         updateResults();
     }
@@ -811,7 +924,7 @@ function activateConfidenceButton(level) {
 
 function syncConfidenceToAlpha(alpha, { skipUpdate = false } = {}) {
     selectedConfidenceLevel = 1 - alpha;
-    if ([0.8, 0.9, 0.95, 0.99].some(level => Math.abs(level - selectedConfidenceLevel) < 1e-6)) {
+    if ([0.9, 0.95, 0.99].some(level => Math.abs(level - selectedConfidenceLevel) < 1e-6)) {
         activateConfidenceButton(selectedConfidenceLevel);
     } else {
         activateConfidenceButton(-1);
@@ -860,7 +973,7 @@ function detectDelimiter(line) {
     return ',';
 }
 
-function parseDelimitedText(text, expectedColumns) {
+function parseDelimitedText(text, expectedColumns, { maxRows = MAX_UPLOAD_ROWS } = {}) {
     const trimmed = text.trim();
     if (!trimmed) {
         throw new Error('File is empty.');
@@ -891,6 +1004,9 @@ function parseDelimitedText(text, expectedColumns) {
             continue;
         }
         rows.push(numericValues);
+        if (rows.length > maxRows) {
+            throw new Error(`Upload limit exceeded: Only ${maxRows} row(s) are supported per file. Use a summary or split the dataset.`);
+        }
     }
     if (!rows.length) {
         throw new Error(errors.length ? errors[0] : 'No numeric rows found.');
@@ -908,49 +1024,83 @@ function setFileFeedback(message, type = '') {
     }
 }
 
+function updateUploadStatus(mode, message, status = '') {
+    let targetId = '';
+    if (mode === InputModes.PAIRED) {
+        targetId = 'paired-upload-status';
+    } else if (mode === InputModes.DIFFERENCE) {
+        targetId = 'difference-upload-status';
+    }
+    if (!targetId) return;
+    const target = document.getElementById(targetId);
+    if (!target) return;
+    target.textContent = message;
+    target.classList.remove('success', 'error');
+    if (status) {
+        target.classList.add(status);
+    }
+}
+
 function importPairedData(text) {
-    const { headers, rows, errors } = parseDelimitedText(text, 2);
-    clearPairedRows();
-    rows.forEach((values, index) => {
-        const labelBase = headers[0] ? `${headers[0]} ${index + 1}` : generatePairLabel(index);
-        addPairedRow({
-            label: labelBase,
-            before: values[0],
-            after: values[1]
-        });
-    });
-    setFileFeedback(`Loaded ${rows.length} pairs from ${headers.join(', ')}. ${errors.length ? `Skipped ${errors.length} row(s).` : ''}`, 'success');
-    updateResults();
+    try {
+        const { headers, rows, errors } = parseDelimitedText(text, 2, { maxRows: MAX_UPLOAD_ROWS });
+        uploadedPairedData = {
+            beforeValues: rows.map(values => values[0]),
+            afterValues: rows.map(values => values[1]),
+            differences: rows.map(values => values[1] - values[0]),
+            rowCount: rows.length
+        };
+        const skippedNote = errors.length ? ` Skipped ${errors.length} row(s).` : '';
+        const headerNote = headers.join(', ');
+        setFileFeedback(`Loaded ${rows.length} pairs from ${headerNote}.${skippedNote}`, 'success');
+        updateUploadStatus(InputModes.PAIRED, `${rows.length} pair(s) ready.${skippedNote}`, 'success');
+        updateResults();
+    } catch (error) {
+        uploadedPairedData = null;
+        updateUploadStatus(InputModes.PAIRED, error.message, 'error');
+        setFileFeedback(error.message, 'error');
+        throw error;
+    }
 }
 
 function importDifferenceData(text) {
-    const { headers, rows, errors } = parseDelimitedText(text, 1);
-    clearDifferenceRows();
-    rows.forEach((values, index) => {
-        const labelBase = headers[0] ? `${headers[0]} ${index + 1}` : generatePairLabel(index);
-        addDifferenceRow({
-            label: labelBase,
-            diff: values[0]
-        });
-    });
-    setFileFeedback(`Loaded ${rows.length} differences from column "${headers[0] || 'diff'}". ${errors.length ? `Skipped ${errors.length} row(s).` : ''}`, 'success');
-    updateResults();
+    try {
+        const { headers, rows, errors } = parseDelimitedText(text, 1, { maxRows: MAX_UPLOAD_ROWS });
+        uploadedDifferenceData = {
+            differences: rows.map(values => values[0]),
+            rowCount: rows.length
+        };
+        const skippedNote = errors.length ? ` Skipped ${errors.length} row(s).` : '';
+        const column = headers[0] || 'diff';
+        setFileFeedback(`Loaded ${rows.length} differences from column "${column}".${skippedNote}`, 'success');
+        updateUploadStatus(InputModes.DIFFERENCE, `${rows.length} difference(s) ready.${skippedNote}`, 'success');
+        updateResults();
+    } catch (error) {
+        uploadedDifferenceData = null;
+        updateUploadStatus(InputModes.DIFFERENCE, error.message, 'error');
+        setFileFeedback(error.message, 'error');
+        throw error;
+    }
 }
 
 function handleFile(file) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = event => {
-        try {
-            if (activeMode === InputModes.PAIRED) {
+        if (activeMode === InputModes.PAIRED) {
+            try {
                 importPairedData(event.target.result);
-            } else if (activeMode === InputModes.DIFFERENCE) {
-                importDifferenceData(event.target.result);
-            } else {
-                setFileFeedback('File import is only available for paired or difference modes.', 'error');
+            } catch {
+                // Errors already surfaced via status text.
             }
-        } catch (error) {
-            setFileFeedback(error.message, 'error');
+        } else if (activeMode === InputModes.DIFFERENCE) {
+            try {
+                importDifferenceData(event.target.result);
+            } catch {
+                // Errors already surfaced via status text.
+            }
+        } else {
+            setFileFeedback('Switch to a paired or difference upload mode to import files.', 'error');
         }
     };
     reader.onerror = () => setFileFeedback('Unable to read the file.', 'error');
@@ -1023,6 +1173,14 @@ function setupTemplateDownloads() {
     }
 }
 
+function refreshScenarioDownloadVisibility() {
+    const button = document.getElementById('scenario-download');
+    if (!button) return;
+    const shouldShow = Boolean(scenarioRawFile) && activeMode !== InputModes.MANUAL;
+    button.classList.toggle('hidden', !shouldShow);
+    button.disabled = !shouldShow;
+}
+
 function resetScenarioDownload() {
     const button = document.getElementById('scenario-download');
     scenarioRawFile = '';
@@ -1031,6 +1189,7 @@ function resetScenarioDownload() {
         button.removeAttribute('data-file');
         button.textContent = 'Download scenario dataset';
     }
+    refreshScenarioDownloadVisibility();
 }
 
 function enableScenarioDownload(filePath) {
@@ -1043,7 +1202,9 @@ function enableScenarioDownload(filePath) {
         button.setAttribute('data-file', filePath);
     } else {
         resetScenarioDownload();
+        return;
     }
+    refreshScenarioDownloadVisibility();
 }
 
 function setupScenarioDownloadButton() {
@@ -1232,8 +1393,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (createdLabel) createdLabel.textContent = CREATED_DATE;
     if (modifiedLabel) modifiedLabel.textContent = modifiedDate;
 
-    clearPairedRows();
-    clearDifferenceRows();
+    setupManualControls();
     setupModeButtons();
     setupAlphaControl();
     setupConfidenceButtons();
@@ -1241,19 +1401,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupTemplateDownloads();
     setupScenarioSelector();
     setupScenarioDownloadButton();
-    document.getElementById('add-paired-row')?.addEventListener('click', () => {
-        addPairedRow();
-    });
-    document.getElementById('clear-paired')?.addEventListener('click', () => {
-        clearPairedRows();
-        updateResults();
-    });
-    document.getElementById('add-diff-row')?.addEventListener('click', () => {
-        addDifferenceRow();
-    });
-    document.getElementById('clear-diff')?.addEventListener('click', () => {
-        clearDifferenceRows();
-        updateResults();
-    });
-    updateResults();
+    switchMode(activeMode, { suppressUpdate: true });
+    refreshScenarioDownloadVisibility();
 });
